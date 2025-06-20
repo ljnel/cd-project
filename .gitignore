@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 pinocchio/
 .DS_Store
+.ipynb_checkpoints/
