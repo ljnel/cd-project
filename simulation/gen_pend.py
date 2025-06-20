@@ -3,20 +3,23 @@ import numpy as np
 
 
 def create_model():
+    "Create a Pinocchio model for an inverted pendulum."
     model = pin.Model()
 
     mass = 1.0   # kg
     length = 1.0  # meters
 
-    joint_id = model.addJoint(0, 
+    joint_id = model.addJoint(0,
                               pin.JointModelRX(),
                               pin.SE3.Identity(),
                               "pendulum_joint"
                               )
     inertia = pin.Inertia(mass,
                           np.array([0., 0., length / 2]),
-                          pin.Inertia.FromCylinder(mass, length / 20, length).inertia)
-    model.appendBodyToJoint(joint_id, 
+                          pin.Inertia.FromCylinder(mass,
+                                                   length / 20,
+                                                   length).inertia)
+    model.appendBodyToJoint(joint_id,
                             inertia,
                             pin.SE3.Identity())
     model.gravity.linear[2] = -9.81
@@ -24,8 +27,9 @@ def create_model():
     return model
 
 
-def simulate_inverted_pendulum(model, physical_params, simulation_time, dt):
-    init_q, init_v, damping_coeff = physical_params  # initial angle, angular velocity and damping coefficient
+def simulate_inverted_pendulum(model, t, steps, params):
+    init_q, init_v, damping_coeff = params  # angle, ang vel, damping coeff
+    dt = t / steps
 
     data = model.createData()
 
@@ -34,8 +38,7 @@ def simulate_inverted_pendulum(model, physical_params, simulation_time, dt):
 
     trajectory = []
 
-    num_steps = int(simulation_time / dt)
-    for i in range(num_steps):
+    for i in range(steps):
         trajectory.append([q.copy(), v.copy()])
 
         tau = np.array([-damping_coeff * v])
@@ -47,45 +50,44 @@ def simulate_inverted_pendulum(model, physical_params, simulation_time, dt):
     return np.array(trajectory).T
 
 
-def gen_trajs(n_simulations, t, dt, q_lim, v_lim, b_lim):
+def gen_trajs(n_simulations, t, steps, param_dists):
+    "Simulate multiple trajectories with given param distributions."
+    qs = param_dists['q'].rvs(n_simulations)
+    vs = param_dists['v'].rvs(n_simulations)
+    bs = param_dists['b'].rvs(n_simulations)
 
-    times = np.arange(0., t, step=dt)
-    trajs = np.zeros((n_simulations, 2, int(t / dt)))
+    times = np.linspace(0., t, steps)
+    trajs = np.zeros((n_simulations, 2, steps))
     model = create_model()
 
     for i in range(n_simulations):
 
-        q = np.random.uniform(-q_lim, q_lim)
-        v = np.random.uniform(-v_lim, v_lim)
-        b = np.random.uniform(0, b_lim)
+        q = qs[i]
+        v = vs[i]
+        b = bs[i]
         params = (q, v, b)
 
         traj = simulate_inverted_pendulum(
-            model, params, t, dt
+            model, t, steps, params
         )
-        trajs[i, :, :] = traj
+        trajs[i] = traj
 
     trajs = np.array(trajs).reshape(n_simulations, 2, -1)
     return times.astype(np.float32), trajs.astype(np.float32)
 
 
-def gen_one_traj(t, dt, q, v, b):
+def gen_one_traj(t, steps, q, v, b):
 
-    times = np.arange(0., t, step=dt)
-    trajs = np.zeros((1, 2, int(t / dt)))
+    times = np.linspace(0, t, steps)
     model = create_model()
 
-    for i in range(1):
+    q = np.array(q)
+    v = np.array(v)
+    b = np.array(b)
+    params = (q, v, b)
 
-        q = np.array(q)
-        v = np.array(v)
-        b = np.array(b)
-        params = (q, v, b)
+    traj = simulate_inverted_pendulum(
+        model, t, steps, params
+    )
 
-        traj = simulate_inverted_pendulum(
-            model, params, t, dt
-        )
-        trajs[i, :, :] = traj
-
-    trajs = np.array(trajs).reshape(1, 2, -1)
-    return times.astype(np.float32), trajs.astype(np.float32)
+    return times.astype(np.float32), traj.astype(np.float32)
