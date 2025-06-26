@@ -23,6 +23,8 @@ class CDPolynomial():
         self.moments += eps * np.eye(self.n_monomials, self.n_monomials)
         self.L = np.linalg.cholesky(self.moments)
 
+        self.maxval = self(data).max()
+
     def __call__(self, z):
         """
         Evaluate the CD polynomial at an array of points
@@ -34,6 +36,13 @@ class CDPolynomial():
         return np.einsum('bi,ib->b', poly, z)
         # return np.einsum('bi,ib->b', poly,
         #                  np.linalg.solve(self.moments, poly.T))
+
+    def plot(self, ax, multiplier=1., **plot_kwargs):
+        """
+        Plot the contours of this CD polynomial.
+        """
+        levels = [multiplier * self.maxval * 10 ** i for i in range(10)]
+        plot_contours(self, ax, levels=levels, **plot_kwargs)
 
 
 def plot_contours(f, ax, **plot_kwargs):
